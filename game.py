@@ -1,19 +1,12 @@
-from math import floor
-from player import Player
+from player import Player, PlayerType
 from deck import Deck
-from ai import RandomAi
-from util import get_valid_input, get_valid_int_input, create_game_state, card_to_rank, card_to_suit
+from util import get_valid_int_input, create_game_state, card_to_rank, card_to_suit
 
 class SpadesGame:
-    # Notes #
-    # Have self.players be a list of AI agents. Have input from start asking for x manual players and y AI players
-    # Player 1 (M)
-    # Player 2 (AI_RAND)
-    # Player 3 (AI_SEARCH)
-    def __init__(self, num_agents, num_rounds):
+    def __init__(self, num_manual, num_random, num_serach, num_rounds):
         self.round = num_rounds
-        self.num_players = num_agents + 1
-        self.players = [Player("Manual")] + [Player(f"Player {i+1}") for i in range(1, self.num_players)]
+        self.num_players = num_manual + num_random + num_serach
+        self.players = [Player(f"Player {i}", PlayerType.MANUAL if i < num_manual else PlayerType.RANDOM if i < num_manual + num_random else PlayerType.SEARCH) for i in range(self.num_players)]
         self.deck = Deck()
         self.trump_suit = 'S'
 
@@ -70,17 +63,10 @@ class SpadesGame:
         for i in range(self.num_players):
             player_index = (self.dealer_index + 1 + i) % self.num_players
             player = self.players[player_index]
-            if player_index == 0:
-                allowed_bids = [bid for bid in range(self.round + 1) if (total_bid + bid != self.round or player_index != self.dealer_index)]
-                str_allowed_bids = ', '.join(map(str, allowed_bids))
-                print(f"Allowed bids: {str_allowed_bids}")
-                bid = get_valid_input(f"{player.name}, enter your bid: ", str_allowed_bids)
-                bid = int(bid)
-            else:
-                bid = (self.round - total_bid) // (self.num_players - total_bids)
-                if total_bids == self.round - 1 and total_bid + bid == self.round:
-                    bid -= 1
-
+            if player.type == PlayerType.MANUAL:
+                self.print_board(show_hands=True)
+                print(f"{player.name} is bidding")
+            bid = player.getAI().bid(total_bid, total_bids, self.num_players, self.round)
             player.set_bid_amount(bid)
             total_bid += bid
             total_bids += 1
@@ -95,19 +81,15 @@ class SpadesGame:
         for i in range(self.num_players):
             player_index = (starting_player_index + i) % self.num_players
             player = self.players[player_index]
-            if player_index == 0:
+            if player.type == PlayerType.MANUAL:
                 self.print_board(show_hands=True, tricks=trick)
-                print(f"Your hand: {player.hand}")
-                card_index = get_valid_int_input(f"{player.name}, play a card (0-indexed): ", 0, len(player.hand) - 1)
-                card = player.hand.pop(card_index)
-            else:
-                game_state = create_game_state(self, trick, player_index, self.trump_broken_round)
-                card = RandomAi().play(game_state)
-                player.hand.remove(card)
+                print(f"{player.name} is playing")
+            game_state = create_game_state(self, trick, player_index, self.trump_broken_round)
+            card = player.getAI().play(game_state)
+            player.hand.remove(card)
             trick[player_index] = card
             self.cards_played_round.add(card)
             print(f"{player.name} plays {card}")
-
 
         winner_index = self.score_trick(trick, starting_player_index)
         print("*" * 25 + " Ending trick " + "*" * 25)
@@ -125,22 +107,25 @@ class SpadesGame:
             self.print_board(show_hands=True)
             self.starting_player_index = self.play_trick(self.starting_player_index)
 
+        self.print_board()
         self.reset_round()
         print("$" * 25 + " Ending round " + str(self.round) + " " + "$" * 25)
     
     def score_round(self):
         for player in self.players:
-            if player.trick_amount == player.bid_amount:
+            trick_amount = player.trick_amount if player.trick_amount is not None else 0
+            str = f"{player.name} bid {player.bid_amount} and won {trick_amount}"
+            if trick_amount == player.bid_amount:
                 score = player.bid_amount + 10
             else:
                 score = -1 * player.bid_amount
             player.total_score += score
             player.reset_for_new_round()
-            print(f"{player.name} scored {score} points")
+            print(f"{str} scoring {score} points")
     
     def print_board(self, show_hands=False, tricks=None):
         print()
-        print("#" * 35 + " Board Top " + "#" * 35)
+        print("#" * 35 + " Board Top    " + "#" * 35)
         for i, player in enumerate(self.players):
             if show_hands or i == 0:
                 hand_str = ' '.join(str(card) for card in player.hand)
@@ -150,7 +135,7 @@ class SpadesGame:
             trick_str = '____' if tricks is None or tricks[i] is None else str(tricks[i])
             bid_str = '____' if player.bid_amount is None else str(player.bid_amount)
             trick_amount = '0' if player.trick_amount is None else str(player.trick_amount)
-            print(f"{player.name: <15} Hand: {hand_str: <30} Bid: {bid_str: <5} Tricks: {trick_amount: <5} Played: {trick_str}")
+            print(f"{player.name} ({player.type.value}) Hand: {hand_str: <30} Bid: {bid_str: <5} Tricks: {trick_amount: <5} Played: {trick_str}")
         print("#" * 35 + " Board Bottom " + "#" * 35)
         print()
 
@@ -163,10 +148,17 @@ class SpadesGame:
             self.round -= 1
 
         winner = max(self.players, key=lambda player: player.total_score)
+        print("Final Scores:")
+        for player in self.players:
+            print(f"{player.name}: {player.total_score} points")
         print(f"The winner is {winner.name} with {winner.total_score} points")
 
 if __name__ == "__main__":
-    num_agents = get_valid_int_input("Enter the number of AI agents: ", 1, 4)
+    num_manual_players = get_valid_int_input("Enter the number of manual players: ", 0, 4)
+    num_agents_rand = get_valid_int_input("Enter the number of AI agents (Random): ", 1, 4)
+    #num_agents_search = get_valid_int_input("Enter the number of AI agents (Search): ", 0, 4)
+    num_agents_search = 0
     num_rounds = get_valid_int_input("Enter the number of rounds: ", 1, 100)
-    game = SpadesGame(num_agents, num_rounds)
+    game = SpadesGame(num_manual_players, num_agents_rand, num_agents_search,
+                      num_rounds)
     game.play_game()

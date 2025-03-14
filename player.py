@@ -1,10 +1,18 @@
+from ai import RandomAi, ManualAi
+from enum import Enum
+
+class PlayerType(Enum):
+    MANUAL = "Manual"
+    RANDOM = "Random"
+    SEARCH = "Search"
 class Player:
-    def __init__(self, name):
+    def __init__(self, name, type):
         self.name = name
         self.hand = []
         self.bid_amount = None
         self.trick_amount = None
         self.total_score = 0
+        self.type = type
 
     def add_card_to_hand(self, card):
         self.hand.append(card)
@@ -33,3 +41,12 @@ class Player:
         self.hand = []
         self.bid_amount = None
         self.trick_amount = None
+
+    def getAI(self):
+        if self.type == PlayerType.RANDOM:
+            return RandomAi()
+        elif self.type == PlayerType.MANUAL:
+            return ManualAi()
+        else:
+            return RandomAi()
+        
