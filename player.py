@@ -1,16 +1,18 @@
-from ai import RandomAi, ManualAi
+from ai import RandomAi, ManualAi, MaxNAi
 from enum import Enum
 
 class PlayerType(Enum):
     MANUAL = "Manual"
     RANDOM = "Random"
+    MAXN = "MaxN"
     SEARCH = "Search"
 class Player:
-    def __init__(self, name, type):
+    def __init__(self, name, type, id):
+        self.id = id
         self.name = name
         self.hand = []
         self.bid_amount = None
-        self.trick_amount = None
+        self.trick_amount = 0
         self.total_score = 0
         self.type = type
 
@@ -30,8 +32,6 @@ class Player:
         self.bid_amount = bid
 
     def increment_trick_amount(self):
-        if self.trick_amount is None:
-            self.trick_amount = 0
         self.trick_amount += 1
 
     def update_total_score(self, score):
@@ -40,13 +40,15 @@ class Player:
     def reset_for_new_round(self):
         self.hand = []
         self.bid_amount = None
-        self.trick_amount = None
+        self.trick_amount = 0
 
     def getAI(self):
         if self.type == PlayerType.RANDOM:
             return RandomAi()
         elif self.type == PlayerType.MANUAL:
             return ManualAi()
+        elif self.type == PlayerType.MAXN:
+            return MaxNAi()
         else:
             return RandomAi()
         
