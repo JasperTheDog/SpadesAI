@@ -1,11 +1,12 @@
-from ai import RandomAi, ManualAi, MaxNAi
+from ai import RandomAi, ManualAi, MaxNAi, ExpectimaxAi, MCTSAi
 from enum import Enum
 
 class PlayerType(Enum):
     MANUAL = "Manual"
     RANDOM = "Random"
     MAXN = "MaxN"
-    SEARCH = "Search"
+    EXPECTIMAX = "Expectimax"
+    MCTS = "MCTS"
 class Player:
     def __init__(self, name, type, id):
         self.id = id
@@ -49,6 +50,10 @@ class Player:
             return ManualAi()
         elif self.type == PlayerType.MAXN:
             return MaxNAi()
+        elif self.type == PlayerType.EXPECTIMAX:
+            return ExpectimaxAi()
+        elif self.type == PlayerType.MCTS:
+            return MCTSAi()
         else:
             return RandomAi()
         

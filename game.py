@@ -6,10 +6,21 @@ import argparse
 import random
 
 class SpadesGame:
-    def __init__(self, num_manual, num_random, num_agents_min_max, num_rounds, skip_rounds_below=0):
+    def __init__(self, num_manual, num_random, num_agents_min_max, num_agents_expectimax, num_agents_mcts, num_rounds, skip_rounds_below=0, text_disable=False):
         self.round = num_rounds
-        self.num_players = num_manual + num_random + num_agents_min_max
-        self.players = [Player(f"Player {i}", PlayerType.MANUAL if i < num_manual else PlayerType.RANDOM if i < num_manual + num_random else PlayerType.MAXN, i) for i in range(self.num_players)]
+        self.num_players = num_manual + num_random + num_agents_min_max + num_agents_expectimax + num_agents_mcts
+        self.players = [
+            Player(
+            f"Player {i}",
+            PlayerType.MANUAL if i < num_manual else
+            PlayerType.RANDOM if i < num_manual + num_random else
+            PlayerType.MAXN if i < num_manual + num_random + num_agents_min_max else
+            PlayerType.EXPECTIMAX if i < num_manual + num_random + num_agents_min_max + num_agents_expectimax else
+            PlayerType.MCTS,
+            i
+            )
+            for i in range(self.num_players)
+        ]
         random.shuffle(self.players)
         self.deck = Deck()
         self.trump_suit = 'S'
@@ -22,6 +33,7 @@ class SpadesGame:
 
         # Options
         self.skip_rounds_below = skip_rounds_below
+        self.text_disable = text_disable
 
     def reset_round(self):
         self.cards_played_round = set()
@@ -58,66 +70,80 @@ class SpadesGame:
                 winning_rank = card_rank
         winner = self.players[winner_index]
         winner.increment_trick_amount()
-        print(f"{winner.name} wins the trick")
+        if not self.text_disable:
+            print(f"{winner.name} wins the trick")
         return winner_index
 
     ## Phases
 
     def bidding_phase(self):
-        print()
-        print("-" * 25 + " Starting bidding phase " + "-" * 25)
+        if not self.text_disable:
+            print()
+            print("-" * 25 + " Starting bidding phase " + "-" * 25)
         total_bid = 0
         total_bids = 0
         for i in range(self.num_players):
             player_index = (self.dealer_index + 1 + i) % self.num_players
             player = self.players[player_index]
             if player.type == PlayerType.MANUAL:
-                self.print_board(show_hands=True)
-                print(f"{player.name} is bidding")
+                if not self.text_disable:
+                    self.print_board(show_hands=True)
+                    print(f"{player.name} is bidding")
             bid = player.getAI().bid(self.players[player_index].hand, total_bid, total_bids, self.num_players, self.round)
             player.set_bid_amount(bid)
             total_bid += bid
             total_bids += 1
-            print(f"{player.name} bids {bid}")
-        print("-" * 25 + " Ending bidding phase " + "-" * 25)
+            if not self.text_disable:
+                print(f"{player.name} bids {bid}")
+        if not self.text_disable:
+            print("-" * 25 + " Ending bidding phase " + "-" * 25)
 
 
     def play_trick(self, starting_player_index):
-        print()
-        print("*" * 25 + " Starting trick " + "*" * 25)
+        if not self.text_disable:
+            print()
+            print("*" * 25 + " Starting trick " + "*" * 25)
         trick = [None] * self.num_players
         for i in range(self.num_players):
             player_index = (starting_player_index + i) % self.num_players
             player = self.players[player_index]
             if player.type == PlayerType.MANUAL:
-                self.print_board(show_hands=True, tricks=trick)
-                print(f"{player.name} is playing")
+                if not self.text_disable:
+                    self.print_board(show_hands=True, tricks=trick)
+                    print(f"{player.name} is playing")
             game_state = create_game_state(self, trick, player_index, self.trump_broken_round)
             card = player.getAI().play(game_state)
             player.hand.remove(card)
             trick[player_index] = card
             self.cards_played_round.add(card)
-            print(f"{player.name} plays {card}")
+            if not self.text_disable:
+                print(f"{player.name} plays {card}")
 
         winner_index = self.score_trick(trick, starting_player_index)
-        print("*" * 25 + " Ending trick " + "*" * 25)
+        if not self.text_disable:
+            print("*" * 25 + " Ending trick " + "*" * 25)
         return winner_index
 
     def play_round(self):
-        print("$" * 25 + " Starting round " + str(self.round) + " " + "$" * 25)
-        for player in self.players:
-            print(f"{player.name} has {player.total_score} points")
+        if not self.text_disable:
+            print()
+            print("$" * 25 + " Starting round " + str(self.round) + " " + "$" * 25)
+            for player in self.players:
+                print(f"{player.name} has {player.total_score} points")
         num_cards = self.round
         self.deal_cards(num_cards)
         self.bidding_phase()
 
         for _ in range(num_cards):
-            self.print_board(show_hands=True)
+            if not self.text_disable:
+                self.print_board(show_hands=True)
             self.starting_player_index = self.play_trick(self.starting_player_index)
 
-        self.print_board()
+        if not self.text_disable:
+            self.print_board()
         self.reset_round()
-        print("$" * 25 + " Ending round " + str(self.round) + " " + "$" * 25)
+        if not text_disable:
+            print("$" * 25 + " Ending round " + str(self.round) + " " + "$" * 25)
     
     def score_round(self):
         for player in self.players:
@@ -129,7 +155,8 @@ class SpadesGame:
                 score = -1 * player.bid_amount
             player.total_score += score
             player.reset_for_new_round()
-            print(f"{str} scoring {score} points")
+            if not self.text_disable:
+                print(f"{str} scoring {score} points")
     
     def print_board(self, show_hands=False, tricks=None):
         print()
@@ -150,7 +177,8 @@ class SpadesGame:
 
     def play_game(self):
         while self.round > self.skip_rounds_below:
-            self.print_board()
+            if not self.text_disable:
+                self.print_board()
             self.play_round()
             self.score_round()
             self.round -= 1
@@ -166,23 +194,29 @@ class SpadesGame:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Play a game of Spades.")
     parser.add_argument("-m", "--manual", type=int, default=0, help="Number of manual players (0-4).")
-    parser.add_argument("-r", "--random", type=int, default=1, help="Number of AI agents (Random) (1-4).")
-    parser.add_argument("-x", "--minmax", type=int, default=0, help="Number of AI agents (MinMax) (0-4).")
+    parser.add_argument("-r", "--random", type=int, default=0, help="Number of AI agents (Random) (0-4).")
+    parser.add_argument("-x", "--maxn", type=int, default=0, help="Number of AI agents (MaxN) (0-4).")
+    parser.add_argument("-e", "--expectimax", type=int, default=0, help="Number of AI agents (Expectimax) (0-4).")
+    parser.add_argument("-mcts", "--montecarlo", type=int, default=0, help="Number of AI agents (Monte Carlo Tree Search) (0-4).")
     parser.add_argument("-n", "--rounds", type=int, default=10, help="Number of rounds (1-100).")
     parser.add_argument("-s", "--sim", type=int, default=None, help="Simulation mode (1-1000).")
+    parser.add_argument("-d", "--disable-text", action="store_true", help="Disable text output.")
     args = parser.parse_args()
 
     num_manual_players = args.manual
     num_agents_rand = args.random
-    num_agents_min_max = args.minmax
-    total_players = num_manual_players + num_agents_rand + num_agents_min_max
-    num_rounds = args.rounds
+    num_agents_max_n = args.maxn
+    num_agents_expectimax = args.expectimax
+    num_agents_mcts = args.montecarlo
+    text_disable = args.disable_text
+    total_players = num_manual_players + num_agents_rand + num_agents_max_n + num_agents_expectimax + num_agents_mcts
+    num_rounds = args.rounds 
 
     if args.sim:
         stats = []
         for _ in range(args.sim):
             print("Game:", _ + 1)
-            game = SpadesGame(num_manual_players, num_agents_rand, num_agents_min_max, num_rounds, 2)
+            game = SpadesGame(num_manual_players, num_agents_rand, num_agents_max_n, num_agents_expectimax, num_agents_mcts , num_rounds, 0, text_disable)
             sorted_score_players = game.play_game()
             single_game_stats = {player.id: (i + 1, player.total_score) for i, player in enumerate(sorted_score_players)}
             stats.append(single_game_stats)
@@ -202,5 +236,5 @@ if __name__ == "__main__":
             print(f"Player {player_id}: Average Standing: {avg_standing:.2f}, Average Score: {avg_score:.2f}")
 
     else:
-        game = SpadesGame(num_manual_players, num_agents_rand, num_agents_min_max, num_rounds)
+        game = SpadesGame(num_manual_players, num_agents_rand, num_agents_max_n,num_agents_expectimax , num_agents_mcts, num_rounds, 0, text_disable)
         game.play_game()

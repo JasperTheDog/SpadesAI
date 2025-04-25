@@ -20,8 +20,18 @@ class GameState:
         else:
             return []
     
+    def isTerminal(self):
+        return len(self.player_hands[self.curr_player_index]) == 0 and all(card is None for card in self.cards_played_trick)
+    
     def generateSuccessor(self, cardPlayed):
+        # print()
         new_player_hands = [hand[:] for hand in self.player_hands]
+        # print(f"Current player index: {self.curr_player_index}")
+        # print(f"Player hands: {self.player_hands}")
+        # print(f"Card played: {cardPlayed}")
+        # print(f"Cards played round: {self.cards_played_round}")
+        # print(f"Cards played trick: {self.cards_played_trick}")
+        # print(f"Trump broken: {self.trump_broken}")
         new_player_hands[self.curr_player_index].remove(cardPlayed)
         new_cards_played_round = self.cards_played_round.copy()
         new_cards_played_trick = self.cards_played_trick[:]
@@ -33,7 +43,7 @@ class GameState:
             new_tricks_won[winner_index] += 1
             new_cards_played_trick = [None] * len(self.player_hands)
 
-        
+        # print()
         return GameState(
             self.round,
             new_player_hands,
@@ -69,6 +79,18 @@ class GameState:
                 winning_rank = card_rank
         return winner_index
 
+    def clone(self):
+        return GameState(
+            self.round,
+            [hand[:] for hand in self.player_hands],
+            self.curr_player_index,
+            self.cards_played_round.copy(),
+            self.cards_played_trick[:],
+            self.trump_broken,
+            self.bids[:],
+            self.tricks_won[:]
+        )
+
 
 class PlayerState:
     def __init__(self, bid, tricks_won, hand_size, cards=None):
@@ -94,12 +116,6 @@ def playable_cards(gameState: GameState):
     else:
         card_pool = player_hand
 
-    # print(f"Current player index: {gameState.curr_player_index}")
-    # print(f"Player hand: {player_hand}")
-    # print(f"Card pool: {card_pool}")
-    # print(f"Cards played round: {gameState.cards_played_round}")
-    # print(f"Cards played trick: {gameState.cards_played_trick}")
-    # print(f"Trump broken: {gameState.trump_broken}")
     if all(card is None for card in gameState.cards_played_trick):
         all_spades = all(card_to_suit(card) == 'S' for card in card_pool)
         if not gameState.trump_broken and not all_spades:
